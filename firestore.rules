@@ -1,0 +1,109 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerified() {
+      // In this app, we trust Google Login. 
+      // For strict clinical contexts, we check verification.
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.email is string &&
+             data.email.size() < 256;
+    }
+
+    function isValidTestResult(data) {
+      return data.keys().hasAll(['userId', 'type', 'duration', 'errors', 'timestamp', 'tScore', 'percentile', 'interpretation']) &&
+             data.userId == request.auth.uid &&
+             data.type in ['TMT-A', 'TMT-B', 'Level-1', 'Level-2', 'Level-3', 'Level-4', 'Level-5'] &&
+             data.duration is number && data.duration > 0 &&
+             data.errors is int && data.errors >= 0 &&
+             data.tScore is number &&
+             data.percentile is number &&
+             data.interpretation is string &&
+             data.timestamp == request.time;
+    }
+
+    function isValidAIFeedback(data) {
+      return data.keys().hasAll(['userId', 'feedbackText', 'timestamp']) &&
+             data.userId is string &&
+             data.feedbackText is string &&
+             data.timestamp == request.time;
+    }
+
+    // --- Collection Routes ---
+
+    // 0.1 System Health (for connection testing)
+    match /system/health {
+      allow get: if true;
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && 
+                      isValidUser(incoming()) && 
+                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL']);
+    }
+
+    // 2. Test Results Collection
+    match /test_results/{resultId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isVerified() && 
+                    isValidId(resultId) && 
+                    isValidTestResult(incoming());
+      
+      // Test results are generally immutable once submitted
+      allow delete: if isOwner(existing().userId);
+    }
+
+    // 3. AI Feedback Collection
+    match /ai_feedback/{feedbackId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      // Only system/admin (not enabled for clients) should write here.
+      // But for this AI Studio app, we might allow the "client" to write if it's 
+      // purely client-side logic that generates feedback via Gemini.
+      // If the app uses Gemini on the frontend to generate and then saves it:
+      allow create: if isVerified() && 
+                    isValidId(feedbackId) && 
+                    isValidAIFeedback(incoming()) &&
+                    incoming().userId == request.auth.uid;
+    }
+  }
+}

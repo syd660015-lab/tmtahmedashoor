@@ -1,0 +1,6 @@
+{
+  "name": "TrailMaster - Trail Making Test & Cognitive Training",
+  "description": "A comprehensive neuropsychological assessment and training tool based on the Trail Making Test (TMT), featuring Part A & B, level-based training, and AI-powered performance analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["AI Analysis", "Interactive Cognitive Testing", "Performance Tracking"]
+}
