@@ -13,6 +13,7 @@ export interface TMTMetrics {
   duration: number;
   errors: number;
   tScore?: number;
+  timestamp?: any;
 }
 
 export interface CognitiveAnalysis {
@@ -22,29 +23,38 @@ export interface CognitiveAnalysis {
     processing_speed: { score: number; feedback: string };
     error_correction: { score: number; feedback: string };
   };
+  trends: {
+    status: 'improving' | 'stable' | 'declining';
+    comment: string;
+  };
   recommendations: string[];
   summary: string;
 }
 
-export async function analyzePerformance(history: TMTMetrics[]): Promise<CognitiveAnalysis> {
+export async function analyzePerformance(history: TMTMetrics[], goals?: string[]): Promise<CognitiveAnalysis> {
   const prompt = `
-    Analyze the following user's Trail Making Test (TMT) clinical history. 
+    Analyze the following user's Trail Making Test (TMT) clinical history and align with their training goals.
     The history includes ${history.length} recent sessions.
+    ${goals && goals.length > 0 ? `User's Training Goals: ${goals.join(', ')}` : ''}
     
     Data:
     ${JSON.stringify(history, null, 2)}
 
     Context for T-Scores:
-    - 70+: Superior
+    - 70+: Superior (Excellent executive function)
     - 60-69: Above Average
-    - 40-59: Normal/Average
-    - 30-39: Below Average
-    - <30: Significant Deficit
+    - 40-59: Normal/Average (Healthy range)
+    - 30-39: Below Average (Mild cognitive impairment indicator)
+    - <30: Significant Deficit (Possible severe neurological or cognitive issues)
 
+    Task:
     Provide a deep clinical cognitive analysis focusing on:
-    1. Attention Span: Ability to maintain task focus and follow sequences.
-    2. Processing Speed: Efficiency of visual scanning and psychomotor speed (Duration vs. Complexity).
-    3. Error Correction: Cognitive flexibility and ability to recover from sequencing mistakes (based on Errors vs. Duration).
+    1. Attention Span: Focus on consistency and error patterns in TMT-A.
+    2. Processing Speed: Analyze the ratio of Duration to Complexity across sessions.
+    3. Error Correction: Cognitive flexibility (TMT-B performance) and the ability to self-correct efficiently.
+    4. Trend Analysis: Compare early sessions to recent ones to determine if the user is improving, stable, or declining.
+    
+    CRITICAL: If goals are provided, tailor the recommendations specifically to help the user achieve them.
 
     Format the response as a valid JSON object with the following structure:
     {
@@ -54,8 +64,12 @@ export async function analyzePerformance(history: TMTMetrics[]): Promise<Cogniti
         "processing_speed": { "score": 0-100, "feedback": "Arabic feedback" },
         "error_correction": { "score": 0-100, "feedback": "Arabic feedback" }
       },
-      "recommendations": ["Instructional steps in Arabic for improvement"],
-      "summary": "One sentence overview in Arabic"
+      "trends": {
+        "status": "improving | stable | declining",
+        "comment": "One sentence summary of the trend in Arabic"
+      },
+      "recommendations": ["4-5 Actionable instructional steps in Arabic"],
+      "summary": "One sentence motivational overview in Arabic"
     }
 
     Notes: 
@@ -82,6 +96,10 @@ export async function analyzePerformance(history: TMTMetrics[]): Promise<Cogniti
         attention_span: { score: 0, feedback: "غير متوفر" },
         processing_speed: { score: 0, feedback: "غير متوفر" },
         error_correction: { score: 0, feedback: "غير متوفر" }
+      },
+      trends: {
+        status: 'stable',
+        comment: "لا توجد بيانات كافية لتحديد الاتجاه."
       },
       recommendations: ["استمر في التدريب المنتظم."],
       summary: "حدث خطأ أثناء رصد البيانات."

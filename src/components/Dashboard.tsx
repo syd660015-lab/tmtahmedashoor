@@ -31,6 +31,21 @@ export default function Dashboard({ onStartTest }: { onStartTest: (type: string)
   const [loading, setLoading] = useState(true);
   const [aiFeedback, setAiFeedback] = useState<any>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+
+  const trainingGoals = [
+    { id: 'speed', label: 'تحسين سرعة المعالجة', icon: '⚡' },
+    { id: 'accuracy', label: 'تقليل الأخطاء', icon: '🎯' },
+    { id: 'flexibility', label: 'زيادة المرونة الذهنية', icon: '🔄' },
+    { id: 'attention', label: 'تعزيز الانتباه', icon: '👁️' },
+    { id: 'score', label: 'رفع الدرجة المعيارية', icon: '📈' }
+  ];
+
+  const toggleGoal = (label: string) => {
+    setSelectedGoals(prev => 
+      prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label]
+    );
+  };
 
   const fetchResults = async () => {
     if (!auth.currentUser) return;
@@ -64,9 +79,11 @@ export default function Dashboard({ onStartTest }: { onStartTest: (type: string)
       type: r.type, 
       duration: r.duration, 
       errors: r.errors,
-      tScore: r.tScore 
+      tScore: r.tScore,
+      timestamp: r.timestamp,
+      percentile: r.percentile
     }));
-    const analysis = await analyzePerformance(history);
+    const analysis = await analyzePerformance(history, selectedGoals);
     setAiFeedback(analysis);
     setAnalyzing(false);
   };
@@ -191,6 +208,40 @@ export default function Dashboard({ onStartTest }: { onStartTest: (type: string)
              </Card>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <Card className="p-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg flex items-center justify-between">
+                <div>
+                   <p className="text-[10px] font-bold uppercase opacity-60">إجمالي الاختبارات</p>
+                   <p className="text-2xl font-black">{results.length}</p>
+                </div>
+                <div className="bg-white/20 p-2 rounded-lg">
+                   <History className="w-5 h-5 text-white" />
+                </div>
+             </Card>
+             <Card className="p-4 bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-lg flex items-center justify-between">
+                <div>
+                   <p className="text-[10px] font-bold uppercase opacity-60">متوسط الدرجة (T-Score)</p>
+                   <p className="text-2xl font-black">
+                     {results.length > 0 ? (results.reduce((acc, curr) => acc + (curr.tScore || 0), 0) / results.length).toFixed(1) : '--'}
+                   </p>
+                </div>
+                <div className="bg-white/20 p-2 rounded-lg">
+                   <TrendingUp className="w-5 h-5 text-white" />
+                </div>
+             </Card>
+             <Card className="p-4 bg-gradient-to-r from-purple-600 to-pink-700 text-white shadow-lg flex items-center justify-between">
+                <div>
+                   <p className="text-[10px] font-bold uppercase opacity-60">مستوى التركيز</p>
+                   <p className="text-xl font-black">
+                      {results.length > 0 ? (results.filter(r => r.errors === 0).length / results.length * 100).toFixed(0) + '%' : '--'}
+                   </p>
+                </div>
+                <div className="bg-white/20 p-2 rounded-lg">
+                   <Sparkles className="w-5 h-5 text-white" />
+                </div>
+             </Card>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
             {/* Chart Column */}
             <div className="lg:col-span-2 flex flex-col gap-6">
@@ -215,6 +266,35 @@ export default function Dashboard({ onStartTest }: { onStartTest: (type: string)
                   )}
                 </div>
               </Card>
+
+              {aiFeedback && (
+                <Card className="p-6 bg-white shadow-sm border-stone-200">
+                  <h3 className="text-sm font-bold text-stone-900 mb-6 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-500" />
+                    تحليل التوازن الإدراكي (بناءً على الذكاء الاصطناعي)
+                  </h3>
+                  <div className="h-[200px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={Object.entries(aiFeedback.domains).map(([key, d]: [string, any]) => ({
+                        name: key === 'attention_span' ? 'الانتباه' : key === 'processing_speed' ? 'السرعة' : 'المرونة',
+                        value: d.score,
+                        fill: key === 'attention_span' ? '#3b82f6' : key === 'processing_speed' ? '#10b981' : '#8b5cf6'
+                      }))}>
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeights: 'bold' }} />
+                        <YAxis hide domain={[0, 100]} />
+                        <Tooltip cursor={{ fill: 'transparent' }} />
+                        <Bar 
+                          dataKey="value" 
+                          radius={[6, 6, 0, 0]} 
+                          barSize={50} 
+                          label={{ position: 'top', fontSize: 12, fontWeight: 'bold', fill: '#333' }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <p className="text-[10px] text-stone-400 text-center mt-4">هذا الرسم البياني يعكس التوازن بين المجالات المعرفية الثلاثة بناءً على آخر تحليل.</p>
+                </Card>
+              )}
 
               <Card className="p-6 bg-white shadow-sm border-stone-200">
                  <div className="flex items-center justify-between mb-4">
@@ -277,30 +357,55 @@ export default function Dashboard({ onStartTest }: { onStartTest: (type: string)
                 </h3>
                 {aiFeedback ? (
                   <div className="space-y-6 relative z-10">
-                    <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10">
+                    <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10 shadow-inner">
                       <p className="text-xs text-stone-100 leading-relaxed italic">"{aiFeedback.summary}"</p>
                     </div>
 
-                    <div className="space-y-4">
-                      {Object.entries(aiFeedback.domains).map(([key, domain]: [string, any]) => (
-                        <div key={key}>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-[10px] uppercase font-bold text-white/70">
-                              {key === 'attention_span' ? 'مدى الانتباه' : 
-                               key === 'processing_speed' ? 'سرعة المعالجة' : 'تصحيح الأخطاء'}
-                            </span>
-                            <span className="text-[10px] font-black">{domain.score}%</span>
+                    <div className="grid grid-cols-1 gap-4">
+                      {aiFeedback.trends && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/10"
+                        >
+                          <div className={`p-2 rounded-full ${
+                            aiFeedback.trends.status === 'improving' ? 'bg-green-500/20 text-green-400' :
+                            aiFeedback.trends.status === 'declining' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            <TrendingUp className="w-4 h-4" />
                           </div>
-                          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${domain.score}%` }}
-                              className="h-full bg-yellow-400" 
-                            />
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold uppercase text-white/50 tracking-wider">الاتجاه المعرفي</span>
+                            <span className="text-xs font-bold text-white leading-tight">{aiFeedback.trends.comment}</span>
                           </div>
-                          <p className="text-[9px] text-stone-300 mt-1 leading-tight">{domain.feedback}</p>
-                        </div>
-                      ))}
+                        </motion.div>
+                      )}
+
+                      <div className="space-y-4">
+                        {Object.entries(aiFeedback.domains).map(([key, domain]: [string, any]) => (
+                          <div key={key} className="group">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-[10px] uppercase font-bold text-white/70 group-hover:text-white transition-colors">
+                                {key === 'attention_span' ? 'مدى الانتباه' : 
+                                 key === 'processing_speed' ? 'سرعة المعالجة' : 'تصحيح الأخطاء'}
+                              </span>
+                              <span className="text-[10px] font-black bg-white/10 px-2 py-0.5 rounded text-yellow-400">{domain.score}%</span>
+                            </div>
+                            <div className="h-2 bg-white/10 rounded-full overflow-hidden shadow-inner">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${domain.score}%` }}
+                                transition={{ duration: 1, ease: "easeOut" }}
+                                className={`h-full ${
+                                  domain.score > 70 ? 'bg-green-400' :
+                                  domain.score > 40 ? 'bg-yellow-400' : 'bg-red-400'
+                                }`} 
+                              />
+                            </div>
+                            <p className="text-[9px] text-stone-400 mt-1.5 leading-relaxed group-hover:text-stone-300 transition-colors">{domain.feedback}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     <Separator className="bg-white/10" />
@@ -316,11 +421,30 @@ export default function Dashboard({ onStartTest }: { onStartTest: (type: string)
                     </div>
                     <Button variant="ghost" size="sm" onClick={handleAIAnalysis} className="w-full text-[10px] text-white/40 hover:text-white/60 hover:bg-white/5 uppercase tracking-widest font-black">إعادة تحليل البيانات</Button>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center py-6 text-center space-y-4 relative z-10">
-                    <p className="text-xs text-stone-400">احصل على تحليل شامل لنقاط قوتك ومواضع التطوير.</p>
-                    <Button disabled={results.length === 0} onClick={handleAIAnalysis} className="bg-white text-primary hover:bg-stone-100 font-bold w-full transition-all">
-                      {analyzing ? 'جاري التحليل...' : 'توليد الرؤى المعرفية'}
+                 ) : (
+                  <div className="flex flex-col items-center py-4 text-center space-y-4 relative z-10">
+                    <div className="w-full text-right mb-2">
+                       <h4 className="text-[10px] font-bold text-white/40 uppercase mb-3">حدد أهدافك التدريبية:</h4>
+                       <div className="grid grid-cols-1 gap-2">
+                          {trainingGoals.map(goal => (
+                            <button
+                              key={goal.id}
+                              onClick={() => toggleGoal(goal.label)}
+                              className={`text-right p-2 rounded-lg border transition-all flex items-center justify-between text-[11px] ${
+                                selectedGoals.includes(goal.label) 
+                                ? 'bg-white/20 border-white/40 text-white font-bold' 
+                                : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10'
+                              }`}
+                            >
+                              <span>{goal.label}</span>
+                              <span>{goal.icon}</span>
+                            </button>
+                          ))}
+                       </div>
+                    </div>
+                    <p className="text-[10px] text-white/40 leading-tight">اختر أهدافك ثم اضغط للتحليل للحصول على خطة مخصصة.</p>
+                    <Button disabled={results.length === 0} onClick={handleAIAnalysis} className="bg-white text-primary hover:bg-stone-100 font-bold w-full transition-all py-6">
+                      {analyzing ? 'جاري تحليل الأنماط...' : 'توليد الرؤى المخصصة'}
                     </Button>
                   </div>
                 )}
