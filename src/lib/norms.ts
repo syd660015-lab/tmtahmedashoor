@@ -19,11 +19,11 @@ export function calculateTScore(type: string, duration: number) {
 }
 
 export function getInterpretation(tScore: number) {
-  if (tScore >= 70) return "High (Superior)";
-  if (tScore >= 60) return "Above Average";
-  if (tScore >= 40) return "Average (Normal Range)";
-  if (tScore >= 30) return "Below Average (Mild Weakness)";
-  return "Well Below Average (Significant Deficit)";
+  if (tScore >= 70) return "متفوق (مرتفع جداً)";
+  if (tScore >= 60) return "فوق المتوسط";
+  if (tScore >= 40) return "متوسط (طبيعي)";
+  if (tScore >= 30) return "تحت المتوسط";
+  return "ضعف شديد";
 }
 
 export function getPercentile(tScore: number) {

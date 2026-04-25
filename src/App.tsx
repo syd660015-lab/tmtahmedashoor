@@ -13,6 +13,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTest, setActiveTest] = useState<string | null>(null);
   const [pendingResult, setPendingResult] = useState<{ type: string; duration: number; errors: number } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -33,27 +34,27 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-stone-50 space-y-4">
         <Loader2 className="w-10 h-10 text-stone-900 animate-spin" />
-        <p className="text-stone-400 font-medium text-sm animate-pulse tracking-widest uppercase">Initializing TrailMaster</p>
+        <p className="text-stone-400 font-medium text-sm animate-pulse tracking-widest uppercase">جاري تهيئة النظام...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 font-sans selection:bg-stone-900 selection:text-white">
+    <div className="min-h-screen bg-stone-50 font-sans selection:bg-stone-900 selection:text-white" dir="rtl">
       {!user ? (
         <Auth />
       ) : activeTest ? (
         <div className="h-screen w-full p-4 md:p-8 flex flex-col">
           <header className="flex justify-between items-center mb-4">
             <div>
-              <h2 className="text-lg font-bold text-stone-900">{activeTest}</h2>
-              <p className="text-xs text-stone-400">Connect the dots in order as quickly as possible.</p>
+              <h2 className="text-lg font-bold text-stone-900">{activeTest === 'TMT-A' ? 'اختبار التتبع (أ)' : activeTest === 'TMT-B' ? 'اختبار التتبع (ب)' : activeTest}</h2>
+              <p className="text-xs text-stone-400">قم بتوصيل النقاط بالترتيب الصحيح في أسرع وقت ممكن.</p>
             </div>
             <button 
               onClick={() => setActiveTest(null)}
               className="text-stone-400 hover:text-stone-900 text-sm font-bold uppercase tracking-widest"
             >
-              Exit Test
+              خروج من الاختبار
             </button>
           </header>
           <div className="flex-1 min-h-0">
@@ -65,17 +66,17 @@ export default function App() {
           </div>
         </div>
       ) : (
-        <Dashboard onStartTest={(type) => setActiveTest(type)} />
+        <Dashboard 
+          onStartTest={(type) => setActiveTest(type)} 
+          refreshTrigger={refreshKey}
+        />
       )}
 
       <ResultDialog 
         result={pendingResult} 
         onDismiss={() => {
           setPendingResult(null);
-          // Refresh dashboard data implicit in Dashboard via fetch on mount
-          // but we might want to trigger a refresh.
-          // For now, simplicity is key.
-          window.location.reload(); // Simple refresh for state sync
+          setRefreshKey(prev => prev + 1);
         }} 
       />
       <Toaster position="top-right" />

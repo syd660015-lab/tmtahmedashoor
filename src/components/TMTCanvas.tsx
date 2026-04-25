@@ -25,7 +25,21 @@ export default function TMTCanvas({ type, onComplete, onCancel }: TMTCanvasProps
   const [errors, setErrors] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [lines, setLines] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<any>(null);
+
+  // Live timer effect
+  useEffect(() => {
+    if (startTime && !isFinished) {
+      timerRef.current = setInterval(() => {
+        setElapsedTime((Date.now() - startTime) / 1000);
+      }, 100);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [startTime, isFinished]);
 
   // Generate sequence based on type
   const sequence = useMemo(() => {
@@ -95,6 +109,7 @@ export default function TMTCanvas({ type, onComplete, onCancel }: TMTCanvasProps
     setStartTime(null);
     setErrors(0);
     setLines([]);
+    setElapsedTime(0);
     setIsFinished(false);
   };
 
@@ -109,7 +124,7 @@ export default function TMTCanvas({ type, onComplete, onCancel }: TMTCanvasProps
     if (isFinished) return;
 
     if (index === currentIndex) {
-      if (currentIndex === 0) {
+      if (currentIndex === 0 && !startTime) {
         setStartTime(Date.now());
       }
 
@@ -125,6 +140,7 @@ export default function TMTCanvas({ type, onComplete, onCancel }: TMTCanvasProps
       if (currentIndex === sequence.length - 1) {
         const endTime = Date.now();
         const duration = (endTime - (startTime || endTime)) / 1000;
+        setElapsedTime(duration);
         setIsFinished(true);
         confetti({
           particleCount: 100,
@@ -147,7 +163,7 @@ export default function TMTCanvas({ type, onComplete, onCancel }: TMTCanvasProps
       <div className="p-6 bg-stone-50">
         <div className="grid grid-cols-3 gap-4 bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
           <div className="text-center border-l border-stone-100 last:border-l-0">
-            <div className="text-lg font-black text-primary">{startTime ? ((Date.now() - startTime) / 1000).toFixed(1) : '0.0'} ث</div>
+            <div className="text-lg font-black text-primary">{elapsedTime.toFixed(1)} ث</div>
             <div className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">الزمن الحالي</div>
           </div>
           <div className="text-center border-l border-stone-100 last:border-l-0">

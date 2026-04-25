@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { TrendingUp, History, Brain, Award, LogOut, User as UserIcon, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
-import { analyzePerformance } from '../lib/gemini';
+import { analyzePerformance, CognitiveAnalysis } from '../lib/gemini';
 import { exportToExcel, exportToPDF } from '../lib/export';
 import { Download, FileSpreadsheet, FileText } from 'lucide-react';
 
@@ -26,10 +26,10 @@ interface TestResult {
   interpretation: string;
 }
 
-export default function Dashboard({ onStartTest }: { onStartTest: (type: string) => void }) {
+export default function Dashboard({ onStartTest, refreshTrigger }: { onStartTest: (type: string) => void, refreshTrigger?: number }) {
   const [results, setResults] = useState<TestResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [aiFeedback, setAiFeedback] = useState<any>(null);
+  const [aiFeedback, setAiFeedback] = useState<CognitiveAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
 
@@ -69,7 +69,7 @@ export default function Dashboard({ onStartTest }: { onStartTest: (type: string)
 
   useEffect(() => {
     fetchResults();
-  }, []);
+  }, [refreshTrigger]);
 
   const handleAIAnalysis = async () => {
     if (results.length < 1) return;
